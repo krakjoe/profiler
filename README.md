@@ -36,7 +36,7 @@ Example Output
 ==============
 
 ```
-[0] => Array
+[...] => Array
 (
     [type] => 1
     [timing] => Array
