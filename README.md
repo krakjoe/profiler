@@ -26,4 +26,4 @@ Will fetch details associative information about the current profiling session.
 
 proto void profiler_disable();
 
-Will stop recording information, does not destroy any previously recorded information.
+Will stop recording information, does not destroy any previously recorded information. A call to profiler_disable while the profiler is not enabled will result in an E_WARNING being raised.
