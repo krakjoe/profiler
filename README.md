@@ -35,7 +35,8 @@ Will stop recording information, does not destroy any previously recorded inform
 Example Output
 ==============
 
-'''[0] => Array
+'''
+[0] => Array
         (
             [type] => 1
             [timing] => Array
