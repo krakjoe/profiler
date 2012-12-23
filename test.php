@@ -23,4 +23,7 @@ $test = new my_test_class();
 $test->my_test_method();
 
 print_r(profiler_fetch());
+
+profiler_clear();
+print_r(profiler_fetch());
 ?>

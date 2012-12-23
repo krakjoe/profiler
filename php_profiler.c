@@ -45,6 +45,7 @@ static void profiler_execute_internal(zend_execute_data *data, int return_value_
 const zend_function_entry profiler_functions[] = {
 	PHP_FE(profiler_enable, NULL)
 	PHP_FE(profiler_fetch, NULL)
+	PHP_FE(profiler_clear, NULL)
 	PHP_FE(profiler_disable, NULL)
 	PHP_FE_END
 };
@@ -195,6 +196,11 @@ PHP_FUNCTION(profiler_fetch)
 			}
 		} while ((pprofile = zend_llist_get_next(&PROF_G(profile))) != NULL);
 	}
+}
+
+PHP_FUNCTION(profiler_clear)
+{
+	zend_llist_clean(&PROF_G(profile));
 }
 
 PHP_FUNCTION(profiler_disable)
