@@ -35,41 +35,41 @@ Will stop recording information, does not destroy any previously recorded inform
 Example Output
 ==============
 
-'''
+```
 [0] => Array
+(
+    [type] => 1
+    [timing] => Array
         (
-            [type] => 1
-            [timing] => Array
+            [entered] => Array
                 (
-                    [entered] => Array
-                        (
-                            [tv_sec] => 1356280086
-                            [tv_usec] => 700295
-                        )
-
-                    [left] => Array
-                        (
-                            [tv_sec] => 1356280086
-                            [tv_usec] => 910377
-                        )
-
+                    [tv_sec] => 1356280086
+                    [tv_usec] => 700295
                 )
 
-            [location] => Array
+            [left] => Array
                 (
-                    [file] => /usr/src/php-5.4.8/ext/profiler/test.php
-                    [line] => 23
-                )
-
-            [call] => Array
-                (
-                    [function] => my_test_method
-                    [scope] => my_test_class
-                    [overhead] => 1784
+                    [tv_sec] => 1356280086
+                    [tv_usec] => 910377
                 )
 
         )
-'''
+
+    [location] => Array
+        (
+            [file] => /usr/src/php-5.4.8/ext/profiler/test.php
+            [line] => 23
+        )
+
+    [call] => Array
+        (
+            [function] => my_test_method
+            [scope] => my_test_class
+            [overhead] => 1784
+        )
+
+)
+```
 
 Notes
 =====
