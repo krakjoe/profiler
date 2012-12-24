@@ -66,9 +66,19 @@ profiler.memory=1;
 
 By default, the profiler will record the impact a function call has on the amount of memory allocated by the Zend engine. If you wish to omit recording and outputting this information set profiler.memory=0 in your system php.ini
 
+Callgrind Screenshots
+=====================
+
+profiler is able to output in the defacto callgrind format, which you can inspect using your favourite grinder ...
+
+![alt text](https://github.com/krakjoe/profiler/raw/master/screenshots/kcachegrind-memory.png "Memory Profile View")
+![alt text](https://github.com/krakjoe/profiler/raw/master/screenshots/kcachegrind-cpu.png "CPU Profile View")
+
 
 Example Output
 ==============
+
+The profile data is also accessible in it's true form, calling profiler_fetch will construct an array so that you can analyze the data without the use of grinders.
 
 ```
 [...] => Array
@@ -112,3 +122,4 @@ Notes
 There is negligable overhead not accounted for with each element in the profile data - the overhead of a call is not adjusted to reflect this.
 
 Giving direct access to the information at profile_fetch() time allows you to profile production applications with minimal overhead, during recording the overhead of the profiler should be negligable in most cases.
+
