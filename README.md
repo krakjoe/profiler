@@ -15,34 +15,48 @@ Features
 Howto
 =====
 
-```void profiler_enable();```
+```
+void profiler_enable();
+```
 
 You must enable the profiler before it will start to record data. A call to profiler_enable while the profiler is enabled will result in an E_WARNING being raised.
 
-```void profiler_fetch();```
+```
+void profiler_fetch();
+```
 
 Will fetch detailed associative information about the current profiling session.
 
-```void profiler_clear();```
+```
+void profiler_clear();
+```
 
 Will clear profiler data, ready for another session, does not disable or enable the profiler.
 
-```void profiler_disable();```
+```
+void profiler_disable();
+```
 
 Will stop recording information, does not destroy any previously recorded information. A call to profiler_disable while the profiler is not enabled will result in an E_WARNING being raised.
 
 INI Settings
 ============
 
-```profiler.enabled=0```
+```
+profiler.enabled=0;
+```
 
 By default the profiler must be explicitly enabled in code with profiler_enable. If you wish to automatically profile every call during execution set profiler.enabled=1 in your system php.ini
 
-```profiler.timing=1```
+```
+profiler.timing=1;
+```
 
 By default, the profiler will record the unix time on entry and exit from every profiled function call. If you wish to omit recording and outputting detailed timing information set profiler.timing=0 in your system php.ini
 
-```profiler.memory=1```
+```
+profiler.memory=1;
+```
 
 By default, the profiler will record the impact a function call has on the amount of memory allocated by the Zend engine. If you wish to omit recording and outputting this information set profiler.memory=0 in your system php.ini
 
