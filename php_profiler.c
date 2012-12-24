@@ -32,6 +32,12 @@ ZEND_DECLARE_MODULE_GLOBALS(profiler)
 #define PROFILE_NORMAL 	1
 #define PROFILE_INTERN	2
 
+static __inline__ ticks_t ticks(void) {
+	unsigned x, y;
+	asm volatile ("rdtsc" : "=a" (x), "=d" (y));
+	return ((((ticks_t)x) | ((ticks_t)y) << 32));
+}
+
 typedef void (*zend_execute_handler_t)(zend_op_array *, void ***);
 typedef void (*zend_execute_internal_handler_t)(zend_execute_data *, int, void***);
 
@@ -78,6 +84,9 @@ PHP_MINIT_FUNCTION(profiler)
 	
 	zend_execute = profiler_execute;
 	zend_execute_internal = profiler_execute_internal;
+	
+	REGISTER_LONG_CONSTANT("PROFILE_NORMAL", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("PROFILE_INTERN", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
 	
 	return SUCCESS;
 }
@@ -186,7 +195,8 @@ PHP_FUNCTION(profiler_fetch)
 								if (profile->call.scope) {
 									add_assoc_string(call, "scope", profile->call.scope, strlen(profile->call.scope));
 								}
-								add_assoc_long(call, "overhead", profile->call.overhead);
+								add_assoc_long(call, "memory", profile->call.memory);
+								add_assoc_long(call, "cpu", profile->call.cpu);
 							}
 							add_assoc_zval(profiled, "call", call);
 						}
@@ -225,46 +235,47 @@ static void profiler_destroy(profile_t *profile) {
 }
 
 static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
-	profile_t profile = NULL;
-	zend_bool enabled = PROF_G(enabled);
-	size_t memory;
-	if (enabled) {
-		profile = emalloc(sizeof(*profile));
-		if (profile) {
-			profile->type = type;
-			profile->location.file = estrdup(zend_get_executed_filename(TSRMLS_C));
-			profile->location.line = zend_get_executed_lineno(TSRMLS_C);
-			profile->call.function = estrdup(get_active_function_name(TSRMLS_C));
-			if (!EG(scope)) {
-				profile->call.spacing = NULL;
-				profile->call.scope = NULL;
-			} else {
-				profile->call.scope = estrdup(
-					get_active_class_name(&(profile->call.spacing) TSRMLS_CC)
-				);
-			}	
-			gettimeofday(&(profile->timing.entered), NULL);
+	if (PROF_G(enabled)) {
+		profile_t profile = emalloc(sizeof(*profile));
+		profile->type = type;
+		profile->location.file = estrdup(zend_get_executed_filename(TSRMLS_C));
+		profile->location.line = zend_get_executed_lineno(TSRMLS_C);
+		profile->call.function = estrdup(get_active_function_name(TSRMLS_C));
+		if (!EG(scope)) {
+			profile->call.spacing = NULL;
+			profile->call.scope = NULL;
+		} else {
+			profile->call.scope = estrdup(
+				get_active_class_name(&(profile->call.spacing) TSRMLS_CC)
+			);
+		}	
+		gettimeofday(&(profile->timing.entered), NULL);
 
-			memory = zend_memory_usage(0 TSRMLS_CC);
+		profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
+		profile->call.cpu = ticks();
+		switch(type) {
+			case PROFILE_INTERN: {
+				execute_internal((zend_execute_data *) _input, uret TSRMLS_CC);	
+			} break;
+	
+			case PROFILE_NORMAL: {
+				execute((zend_op_array*) _input TSRMLS_CC);
+			} break;
 		}
-	}
-
-	switch(type) {
-		case PROFILE_INTERN: {
-			execute_internal((zend_execute_data *) _input, uret TSRMLS_CC);	
-		} break;
-		
-		case PROFILE_NORMAL: {
-			execute((zend_op_array*) _input TSRMLS_CC);
-		} break;
-	}
-
-	if (enabled) {
-		profile->call.overhead = (zend_memory_usage(0 TSRMLS_CC) - memory);
+		profile->call.cpu = ticks() - profile->call.cpu;
+		profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
 		gettimeofday(
 			&(profile->timing.left), NULL
 		);			
 		zend_llist_add_element(&PROF_G(profile), &profile);
+	} else switch(type) {
+		case PROFILE_INTERN: {
+			execute_internal((zend_execute_data *) _input, uret TSRMLS_CC);	
+		} break;
+	
+		case PROFILE_NORMAL: {
+			execute((zend_op_array*) _input TSRMLS_CC);
+		} break;
 	}
 }
 

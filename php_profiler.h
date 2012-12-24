@@ -53,11 +53,13 @@ typedef struct {
 	struct timeval left;
 } timing_t;
 
+typedef unsigned long long ticks_t;
 typedef struct {
 	char *scope;
 	const char *spacing;
 	char *function;
-	size_t overhead;
+	size_t memory;
+	ticks_t cpu;
 } call_t;
 
 typedef struct {
