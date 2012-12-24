@@ -75,7 +75,7 @@ zend_module_entry profiler_module_entry = {
 	PHP_RSHUTDOWN(profiler),
 	PHP_MINFO(profiler),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.1",
+	"0.2",
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -83,6 +83,10 @@ zend_module_entry profiler_module_entry = {
 #ifdef COMPILE_DL_PROFILER
 ZEND_GET_MODULE(profiler)
 #endif
+
+PHP_INI_BEGIN()
+PHP_INI_ENTRY("profiler.enabled", "0", PHP_INI_ALL, NULL)
+PHP_INI_END()
 
 PHP_MINIT_FUNCTION(profiler)
 {
@@ -95,27 +99,33 @@ PHP_MINIT_FUNCTION(profiler)
 	REGISTER_LONG_CONSTANT("PROFILE_NORMAL", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("PROFILE_INTERN", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
 	
+	REGISTER_INI_ENTRIES();
+
+	ZEND_INIT_MODULE_GLOBALS(profiler, NULL, NULL);
+
 	return SUCCESS;
 }
-
 
 PHP_MSHUTDOWN_FUNCTION(profiler)
 {
 	zend_execute = zend_execute_original;
 	zend_execute_internal = zend_execute_internal_original;
+		
+	UNREGISTER_INI_ENTRIES();
+
 	return SUCCESS;
 }
 
 PHP_RINIT_FUNCTION(profiler)
 {	
-	ZEND_INIT_MODULE_GLOBALS(profiler, NULL, NULL);
-
+	if (INI_BOOL("profiler.enabled")) {
+		PROF_G(enabled)=1;
+	} else PROF_G(enabled)=0;
+	
 	zend_llist_init(
 		&PROF_G(profile), sizeof(profile_t*), (llist_dtor_func_t) profiler_destroy, 0
-	);
+	);	
 
-	PROF_G(enabled)=0;
-	
 	return SUCCESS;
 }
 
@@ -139,7 +149,7 @@ PHP_FUNCTION(profiler_enable)
 {
 	if (!PROF_G(enabled)) {
 		PROF_G(enabled)=1;	
-	} else zend_error(E_WARNING, "the profiler is currently running enabled");
+	} else zend_error(E_WARNING, "the profiler is already enabled");
 }
 
 PHP_FUNCTION(profiler_fetch) 
@@ -224,19 +234,13 @@ PHP_FUNCTION(profiler_disable)
 {
 	if (PROF_G(enabled)) {
 		PROF_G(enabled)=0;
-	} else zend_error(E_WARNING, "the profiler has not yet been enabled");
+	} else zend_error(E_WARNING, "the profiler is already disabled");
 }
 
 static void profiler_destroy(profile_t *profile) {
 	if (profile) {
-		profile_t pointer = (*profile);
-		if (pointer) {
-			efree(pointer->location.file);	
-			if (pointer->call.function)
-				efree(pointer->call.function);
-			if (pointer->call.scope)
-				efree(pointer->call.scope);
-			efree(pointer);
+		if ((*profile)) {
+			efree((*profile));
 		}
 	}
 }
@@ -245,16 +249,14 @@ static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
 	if (PROF_G(enabled)) {
 		profile_t profile = emalloc(sizeof(*profile));
 		profile->type = type;
-		profile->location.file = estrdup(zend_get_executed_filename(TSRMLS_C));
+		profile->location.file = zend_get_executed_filename(TSRMLS_C);
 		profile->location.line = zend_get_executed_lineno(TSRMLS_C);
-		profile->call.function = estrdup(get_active_function_name(TSRMLS_C));
+		profile->call.function = get_active_function_name(TSRMLS_C);
 		if (!EG(scope)) {
 			profile->call.spacing = NULL;
 			profile->call.scope = NULL;
 		} else {
-			profile->call.scope = estrdup(
-				get_active_class_name(&(profile->call.spacing) TSRMLS_CC)
-			);
+			profile->call.scope = get_active_class_name(&(profile->call.spacing) TSRMLS_CC);
 		}	
 		gettimeofday(&(profile->timing.entered), NULL);
 
