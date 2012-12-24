@@ -24,6 +24,7 @@
 
 #include "php.h"
 #include "php_ini.h"
+#include "php_streams.h"
 #include "ext/standard/info.h"
 #include "php_profiler.h"
 
@@ -58,6 +59,7 @@ static void profiler_execute_internal(zend_execute_data *data, int return_value_
 const zend_function_entry profiler_functions[] = {
 	PHP_FE(profiler_enable, NULL)
 	PHP_FE(profiler_fetch, NULL)
+	PHP_FE(profiler_callgrind, NULL)
 	PHP_FE(profiler_clear, NULL)
 	PHP_FE(profiler_disable, NULL)
 	PHP_FE_END
@@ -75,7 +77,7 @@ zend_module_entry profiler_module_entry = {
 	PHP_RSHUTDOWN(profiler),
 	PHP_MINFO(profiler),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.2",
+	"0.3",
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -86,7 +88,7 @@ ZEND_GET_MODULE(profiler)
 
 PHP_INI_BEGIN()
 PHP_INI_ENTRY("profiler.enabled", "0", PHP_INI_SYSTEM, NULL)
-PHP_INI_ENTRY("profiler.timing", "1", PHP_INI_SYSTEM, NULL)
+PHP_INI_ENTRY("profiler.timing", "0", PHP_INI_SYSTEM, NULL)
 PHP_INI_ENTRY("profiler.memory", "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
@@ -124,9 +126,9 @@ PHP_RINIT_FUNCTION(profiler)
 		PROF_G(enabled)=1;
 	} else PROF_G(enabled)=0;
 	
-	if (!INI_BOOL("profiler.timing")) {
-		PROF_G(timing)=0;
-	} else PROF_G(timing)=1;
+	if (INI_BOOL("profiler.timing")) {
+		PROF_G(timing)=1;
+	} else PROF_G(timing)=0;
 
 	if (!INI_BOOL("profiler.memory")) {
 		PROF_G(memory)=0;
@@ -235,6 +237,46 @@ PHP_FUNCTION(profiler_fetch)
 				add_next_index_zval(return_value, profiled);
 			}
 		} while ((pprofile = zend_llist_get_next(&PROF_G(profile))) != NULL);
+	}
+}
+
+PHP_FUNCTION(profiler_callgrind) 
+{
+	php_stream *stream;
+	zval *resource;
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &resource)==SUCCESS) {
+		php_stream_from_zval(stream, &resource);
+		
+		php_stream_printf(stream TSRMLS_CC, "version: 1\n");
+		php_stream_printf(stream TSRMLS_CC, "creator: profiler\n");
+		php_stream_printf(stream TSRMLS_CC, "pid: %d\n", getpid());	
+		if (PROF_G(memory)) {
+			php_stream_printf(stream TSRMLS_CC, "events: memory cpu\n");
+		} else php_stream_printf(stream TSRMLS_CC, "events: cpu\n");
+		
+		profile_t *pprofile = zend_llist_get_first(&PROF_G(profile));
+		if (pprofile) do {
+			profile_t profile = *pprofile;
+			if (profile) {
+				php_stream_printf(stream TSRMLS_CC, "fl=%s\n", profile->location.file);
+				if (profile->call.scope && strlen(profile->call.scope)) {
+					php_stream_printf(stream TSRMLS_CC, "fn=%s::%s\n", profile->call.scope, profile->call.function);
+				} else php_stream_printf(stream TSRMLS_CC, "fn=%s\n", profile->call.function);
+					
+				if (PROF_G(memory)) {
+					php_stream_printf(
+						stream TSRMLS_CC, 
+						"%d %d %d\n", 
+						profile->location.line, profile->call.memory, profile->call.cpu
+					);
+				} else php_stream_printf(
+					stream TSRMLS_CC, 
+					"%d %d\n", 
+					profile->location.line, profile->call.cpu
+				);
+				php_stream_printf(stream TSRMLS_CC, "\n");
+			}
+		} while(pprofile = zend_llist_get_next(&PROF_G(profile)));
 	}
 }
 

@@ -83,6 +83,7 @@ ZEND_END_MODULE_GLOBALS(profiler)
 
 PHP_FUNCTION(profiler_enable);
 PHP_FUNCTION(profiler_fetch);
+PHP_FUNCTION(profiler_callgrind);
 PHP_FUNCTION(profiler_clear);
 PHP_FUNCTION(profiler_disable);
 

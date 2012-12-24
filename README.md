@@ -28,6 +28,12 @@ void profiler_fetch();
 Will fetch detailed associative information about the current profiling session.
 
 ```
+void profiler_callgrind(resource $stream);
+```
+
+Will write a callgrind of the current profiling session to the stream
+
+```
 void profiler_clear();
 ```
 
@@ -49,10 +55,10 @@ profiler.enabled=0;
 By default the profiler must be explicitly enabled in code with profiler_enable. If you wish to automatically profile every call during execution set profiler.enabled=1 in your system php.ini
 
 ```
-profiler.timing=1;
+profiler.timing=0;
 ```
 
-By default, the profiler will record the unix time on entry and exit from every profiled function call. If you wish to omit recording and outputting detailed timing information set profiler.timing=0 in your system php.ini
+If you wish to record detailed timing information set profiler.timing=0 in your system php.ini, this information is not used in callgrind data
 
 ```
 profiler.memory=1;
