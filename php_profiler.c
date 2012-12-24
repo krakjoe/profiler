@@ -210,7 +210,7 @@ PHP_FUNCTION(profiler_fetch)
 						ALLOC_INIT_ZVAL(location);
 						{
 							array_init(location);
-							add_assoc_string(location, "file", profile->location.file, strlen(profile->location.file));
+							add_assoc_string(location, "file", profile->location.file, 1);
 							add_assoc_long(location, "line", profile->location.line);								
 						}
 						add_assoc_zval(profiled, "location", location);
@@ -220,9 +220,9 @@ PHP_FUNCTION(profiler_fetch)
 							ALLOC_INIT_ZVAL(call);
 							{
 								array_init(call);
-								add_assoc_string(call, "function", profile->call.function, strlen(profile->call.function));
+								add_assoc_string(call, "function", profile->call.function, 1);
 								if (profile->call.scope) {
-									add_assoc_string(call, "scope", profile->call.scope, strlen(profile->call.scope));
+									add_assoc_string(call, "scope", profile->call.scope, 1);
 								}
 								if (PROF_G(memory))
 									add_assoc_long(call, "memory", profile->call.memory);
