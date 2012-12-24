@@ -75,8 +75,10 @@ typedef struct {
 } *profile_t;
 
 ZEND_BEGIN_MODULE_GLOBALS(profiler)
-	zend_bool  enabled;
-	zend_llist profile;
+	zend_bool	enabled;
+	zend_bool	memory;
+	zend_bool	timing;
+	zend_llist	profile;
 ZEND_END_MODULE_GLOBALS(profiler)
 
 PHP_FUNCTION(profiler_enable);

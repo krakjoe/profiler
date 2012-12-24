@@ -85,7 +85,9 @@ ZEND_GET_MODULE(profiler)
 #endif
 
 PHP_INI_BEGIN()
-PHP_INI_ENTRY("profiler.enabled", "0", PHP_INI_ALL, NULL)
+PHP_INI_ENTRY("profiler.enabled", "0", PHP_INI_SYSTEM, NULL)
+PHP_INI_ENTRY("profiler.timing", "1", PHP_INI_SYSTEM, NULL)
+PHP_INI_ENTRY("profiler.memory", "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
 PHP_MINIT_FUNCTION(profiler)
@@ -121,6 +123,14 @@ PHP_RINIT_FUNCTION(profiler)
 	if (INI_BOOL("profiler.enabled")) {
 		PROF_G(enabled)=1;
 	} else PROF_G(enabled)=0;
+	
+	if (!INI_BOOL("profiler.timing")) {
+		PROF_G(timing)=0;
+	} else PROF_G(timing)=1;
+
+	if (!INI_BOOL("profiler.memory")) {
+		PROF_G(memory)=0;
+	} else PROF_G(memory)=1;
 	
 	zend_llist_init(
 		&PROF_G(profile), sizeof(profile_t*), (llist_dtor_func_t) profiler_destroy, 0
@@ -170,30 +180,32 @@ PHP_FUNCTION(profiler_fetch)
 						add_assoc_long(profiled, "type", profile->type);
 						
 						/** insert timing information **/
-						ALLOC_INIT_ZVAL(timing);
-						{
-							zval *entered, *left;
-							array_init(timing);
+						if (PROF_G(timing)) {
+							ALLOC_INIT_ZVAL(timing);
 							{
-								ALLOC_INIT_ZVAL(entered);
+								zval *entered, *left;
+								array_init(timing);
 								{
-									array_init(entered);
-									add_assoc_long(entered, "tv_sec", profile->timing.entered.tv_sec);
-									add_assoc_long(entered, "tv_usec", profile->timing.entered.tv_usec);
-								}
-								add_assoc_zval(timing, "entered", entered);
+									ALLOC_INIT_ZVAL(entered);
+									{
+										array_init(entered);
+										add_assoc_long(entered, "tv_sec", profile->timing.entered.tv_sec);
+										add_assoc_long(entered, "tv_usec", profile->timing.entered.tv_usec);
+									}
+									add_assoc_zval(timing, "entered", entered);
 
-								ALLOC_INIT_ZVAL(left);
-								{
-									array_init(left);
-									add_assoc_long(left, "tv_sec", profile->timing.left.tv_sec);
-									add_assoc_long(left, "tv_usec", profile->timing.left.tv_usec);
+									ALLOC_INIT_ZVAL(left);
+									{
+										array_init(left);
+										add_assoc_long(left, "tv_sec", profile->timing.left.tv_sec);
+										add_assoc_long(left, "tv_usec", profile->timing.left.tv_usec);
+									}
+									add_assoc_zval(timing, "left", left);
 								}
-								add_assoc_zval(timing, "left", left);
+								add_assoc_zval(profiled, "timing", timing);
 							}
-							add_assoc_zval(profiled, "timing", timing);
 						}
-						
+							
 						/** add file information **/
 						ALLOC_INIT_ZVAL(location);
 						{
@@ -212,7 +224,8 @@ PHP_FUNCTION(profiler_fetch)
 								if (profile->call.scope) {
 									add_assoc_string(call, "scope", profile->call.scope, strlen(profile->call.scope));
 								}
-								add_assoc_long(call, "memory", profile->call.memory);
+								if (PROF_G(memory))
+									add_assoc_long(call, "memory", profile->call.memory);
 								add_assoc_long(call, "cpu", profile->call.cpu);
 							}
 							add_assoc_zval(profiled, "call", call);
@@ -255,12 +268,14 @@ static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
 		if (!EG(scope)) {
 			profile->call.spacing = NULL;
 			profile->call.scope = NULL;
-		} else {
-			profile->call.scope = get_active_class_name(&(profile->call.spacing) TSRMLS_CC);
-		}	
-		gettimeofday(&(profile->timing.entered), NULL);
-
-		profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
+		} else profile->call.scope = get_active_class_name(&(profile->call.spacing) TSRMLS_CC);
+	
+		if (PROF_G(timing))
+			gettimeofday(&(profile->timing.entered), NULL);
+		
+		if (PROF_G(memory))
+			profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
+	
 		profile->call.cpu = ticks();
 		switch(type) {
 			case PROFILE_INTERN: {
@@ -272,10 +287,12 @@ static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
 			} break;
 		}
 		profile->call.cpu = ticks() - profile->call.cpu;
-		profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
-		gettimeofday(
-			&(profile->timing.left), NULL
-		);			
+
+		if (PROF_G(memory))
+			profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
+		if (PROF_G(timing))
+			gettimeofday(&(profile->timing.left), NULL);					
+
 		zend_llist_add_element(&PROF_G(profile), &profile);
 	} else switch(type) {
 		case PROFILE_INTERN: {
