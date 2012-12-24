@@ -17,15 +17,19 @@ Howto
 =====
 
 ```void profiler_enable();```
+
 You must enable the profiler before it will start to record data. A call to profiler_enable while the profiler is enabled will result in an E_WARNING being raised.
 
 ```void profiler_fetch();```
+
 Will fetch details associative information about the current profiling session.
 
 ```void profiler_clear();```
+
 Will clear profiler data, ready for another session, does not disable or enable the profiler.
 
 ```void profiler_disable();```
+
 Will stop recording information, does not destroy any previously recorded information. A call to profiler_disable while the profiler is not enabled will result in an E_WARNING being raised.
 
 Example Output
