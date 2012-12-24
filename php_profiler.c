@@ -32,11 +32,18 @@ ZEND_DECLARE_MODULE_GLOBALS(profiler)
 #define PROFILE_NORMAL 	1
 #define PROFILE_INTERN	2
 
+#ifndef _WIN32
 static __inline__ ticks_t ticks(void) {
 	unsigned x, y;
 	asm volatile ("rdtsc" : "=a" (x), "=d" (y));
 	return ((((ticks_t)x) | ((ticks_t)y) << 32));
 }
+#else
+#	include <intrin.h>
+static inline ticks_t ticks(void) {
+	return __rdtsc();
+}
+#endif
 
 typedef void (*zend_execute_handler_t)(zend_op_array *, void ***);
 typedef void (*zend_execute_internal_handler_t)(zend_execute_data *, int, void***);
