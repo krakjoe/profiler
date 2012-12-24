@@ -1,9 +1,7 @@
 profiler
 ========
 
-An extension to profile PHP.
-
-A simple set of functions to allow a basic profile view of your PHP scripts, during or after runtime.
+An extension to allow a basic profile view of your PHP scripts, during or after runtime.
 
 Features
 ========
@@ -12,6 +10,7 @@ Features
 * Detect memory usage, time, and CPU time for each and every call while the profiler is enabled.
 * Fetch detailed associative output from the profiler at any time during execution.
 * Enable/Disable profiler during runtime.
+* Control what is included in the profile for each function call via INI settings
 
 Howto
 =====
@@ -22,7 +21,7 @@ You must enable the profiler before it will start to record data. A call to prof
 
 ```void profiler_fetch();```
 
-Will fetch details associative information about the current profiling session.
+Will fetch detailed associative information about the current profiling session.
 
 ```void profiler_clear();```
 
@@ -31,6 +30,22 @@ Will clear profiler data, ready for another session, does not disable or enable 
 ```void profiler_disable();```
 
 Will stop recording information, does not destroy any previously recorded information. A call to profiler_disable while the profiler is not enabled will result in an E_WARNING being raised.
+
+INI Settings
+============
+
+```profiler.enabled=0```
+
+By default the profiler must be explicitly enabled in code with profiler_enable. If you wish to automatically profile every call during execution set profiler.enabled=1 in your system php.ini
+
+```profiler.timing=1```
+
+By default, the profiler will record the unix time on entry and exit from every profiled function call. If you wish to omit recording and outputting detailed timing information set profiler.timing=0 in your system php.ini
+
+```profiler.memory=1```
+
+By default, the profiler will record the impact a function call has on the amount of memory allocated by the Zend engine. If you wish to omit recording and outputting this information set profiler.memory=0 in your system php.ini
+
 
 Example Output
 ==============
