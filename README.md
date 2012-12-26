@@ -60,6 +60,12 @@ profiler.memory=1;
 
 By default, the profiler will record the impact a function call has on the amount of memory allocated by the Zend engine. If you wish to omit recording and outputting this information set profiler.memory=0 in your system php.ini
 
+```
+profiler.output=/tmp/profile.callgrind;
+```
+
+By default the profiler will write data to profiler.output, in most circumstances you will want to set an explicit path during runtime of your script, which will override this default value for that request/execution.
+
 Callgrind Screenshots
 =====================
 
