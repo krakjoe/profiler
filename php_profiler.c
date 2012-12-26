@@ -92,11 +92,15 @@ PHP_INI_ENTRY("profiler.timing", "0", PHP_INI_SYSTEM, NULL)
 PHP_INI_ENTRY("profiler.memory", "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
+static inline void profiler_globals_ctor(zend_profiler_globals *pg TSRMLS_DC) {
+	pg->enabled = 0;
+	pg->timing = 0;
+	pg->memory = 1;
+}
+static inline void profiler_globals_dtor(zend_profiler_globals *pg TSRMLS_DC) {}
+
 PHP_MINIT_FUNCTION(profiler)
 {
-	zend_execute_original = zend_execute;
-	zend_execute_internal_original = zend_execute_internal;
-	
 	zend_execute = profiler_execute;
 	zend_execute_internal = profiler_execute_internal;
 	
@@ -105,16 +109,13 @@ PHP_MINIT_FUNCTION(profiler)
 	
 	REGISTER_INI_ENTRIES();
 
-	ZEND_INIT_MODULE_GLOBALS(profiler, NULL, NULL);
+	ZEND_INIT_MODULE_GLOBALS(profiler, profiler_globals_ctor, profiler_globals_dtor);
 
 	return SUCCESS;
 }
 
 PHP_MSHUTDOWN_FUNCTION(profiler)
 {
-	zend_execute = zend_execute_original;
-	zend_execute_internal = zend_execute_internal_original;
-		
 	UNREGISTER_INI_ENTRIES();
 
 	return SUCCESS;
@@ -212,7 +213,7 @@ PHP_FUNCTION(profiler_fetch)
 						ALLOC_INIT_ZVAL(location);
 						{
 							array_init(location);
-							add_assoc_string(location, "file", profile->location.file, 1);
+							add_assoc_string(location, "file", (char*) profile->location.file, 1);
 							add_assoc_long(location, "line", profile->location.line);								
 						}
 						add_assoc_zval(profiled, "location", location);
@@ -222,9 +223,9 @@ PHP_FUNCTION(profiler_fetch)
 							ALLOC_INIT_ZVAL(call);
 							{
 								array_init(call);
-								add_assoc_string(call, "function", profile->call.function, 1);
+								add_assoc_string(call, "function", (char*) profile->call.function, 1);
 								if (profile->call.scope) {
-									add_assoc_string(call, "scope", profile->call.scope, 1);
+									add_assoc_string(call, "scope", (char*) profile->call.scope, 1);
 								}
 								if (PROF_G(memory))
 									add_assoc_long(call, "memory", profile->call.memory);
@@ -266,17 +267,17 @@ PHP_FUNCTION(profiler_callgrind)
 				if (PROF_G(memory)) {
 					php_stream_printf(
 						stream TSRMLS_CC, 
-						"%d %d %d\n", 
-						profile->location.line, profile->call.memory, profile->call.cpu
+						"%d %ld %lld\n", 
+						profile->location.line, (profile->call.memory > 0) ? profile->call.memory : 0, profile->call.cpu
 					);
 				} else php_stream_printf(
 					stream TSRMLS_CC, 
-					"%d %d\n", 
+					"%d %lld\n", 
 					profile->location.line, profile->call.cpu
 				);
 				php_stream_printf(stream TSRMLS_CC, "\n");
 			}
-		} while(pprofile = zend_llist_get_next(&PROF_G(profile)));
+		} while((pprofile = zend_llist_get_next(&PROF_G(profile))));
 	}
 }
 
@@ -307,10 +308,7 @@ static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
 		profile->location.file = zend_get_executed_filename(TSRMLS_C);
 		profile->location.line = zend_get_executed_lineno(TSRMLS_C);
 		profile->call.function = get_active_function_name(TSRMLS_C);
-		if (!EG(scope)) {
-			profile->call.spacing = NULL;
-			profile->call.scope = NULL;
-		} else profile->call.scope = get_active_class_name(&(profile->call.spacing) TSRMLS_CC);
+		profile->call.scope = (EG(called_scope)) ? EG(called_scope)->name : "";
 	
 		if (PROF_G(timing))
 			gettimeofday(&(profile->timing.entered), NULL);

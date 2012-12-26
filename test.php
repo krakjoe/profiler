@@ -22,8 +22,6 @@ my_function_call();
 $test = new my_test_class();
 $test->my_test_method();
 
-print_r(profiler_fetch());
 
-profiler_clear();
-print_r(profiler_fetch());
+profiler_callgrind(fopen("profile.callgrind", "w"));
 ?>

@@ -56,14 +56,13 @@ typedef struct {
 typedef unsigned long long ticks_t;
 typedef struct {
 	const char *scope;
-	const char *spacing;
 	const char *function;
 	size_t memory;
 	ticks_t cpu;
 } call_t;
 
 typedef struct {
-	char *file;
+	const char *file;
 	uint line;
 } location_t;
 
