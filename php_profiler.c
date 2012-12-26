@@ -68,7 +68,7 @@ zend_module_entry profiler_module_entry = {
 	PHP_RSHUTDOWN(profiler),
 	PHP_MINFO(profiler),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.3",
+	"0.4",
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
