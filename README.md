@@ -55,12 +55,6 @@ profiler.enabled=0;
 By default the profiler must be explicitly enabled in code with profiler_enable. If you wish to automatically profile every call during execution set profiler.enabled=1 in your system php.ini
 
 ```
-profiler.timing=0;
-```
-
-If you wish to record detailed timing information set profiler.timing=0 in your system php.ini, this information is not used in callgrind data
-
-```
 profiler.memory=1;
 ```
 
