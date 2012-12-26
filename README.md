@@ -1,43 +1,43 @@
 profiler
 ========
 
-An extension to allow a basic profile view of your PHP scripts, during or after runtime.
+An extension to allow a basic profile view of your PHP scripts, during or after runtime. The aim of the profiler is to have as little impact on your application as possible.
+The callgrind it produces can help you to find bottlenecks in your code and identify functions or methods that could use optimization.
 
 Features
 ========
 
 * Profile all userland and internal function and method calls.
-* Detect memory usage, time, and CPU time for each and every call while the profiler is enabled.
-* Fetch detailed associative output from the profiler at any time during execution.
-* Enable/Disable profiler during runtime.
-* Control what is included in the profile for each function call via INI settings
+* Detect memory, and CPU usage for each and every call while the profiler is enabled.
+* Enable/Disable profiler during runtime, allowing you to profile an entire request or just a block of code during a request.
+* Profile production applications with little to no impact on speed and performance.
 
-Howto
+How ?
 =====
+
+profiler overrides the default execution functions of the Zend Engine (zend_execute and zend_execute_internal).
+This means profiler is executed every time a userland or internal function is called, allowing profiler to trace every function call, recording memory and cpu usage. During execution of your script, NO allocations take place. Meaning your code runs at very close to full speed, while still retaining the ability to trace every call and not resort to sampling. By default, a maximum of 1000 frames will be recorded ( the first 1000 calls ), if you're application requires more than this you can configure a higher limit at build time if you configure with --with-profiler-max-frames=newlimit:
+
+```./configure --enable-profiler --with-profiler-max-frames=2000```
+
+would yield a profiler able to record for 2000 calls. Having a hard limit means that during execution we are just shifting pointers around and not allocating additional memory.
+
+How To ?
+========
 
 ```
 void profiler_enable();
 ```
 
 You must enable the profiler before it will start to record data. A call to profiler_enable while the profiler is enabled will result in an E_WARNING being raised.
+You can enable the profiler by default with INI settings, see below.
 
 ```
-void profiler_fetch();
+void profiler_output(string $path);
 ```
 
-Will fetch detailed associative information about the current profiling session.
-
-```
-void profiler_callgrind(resource $stream);
-```
-
-Will write a callgrind of the current profiling session to the stream
-
-```
-void profiler_clear();
-```
-
-Will clear profiler data, ready for another session, does not disable or enable the profiler.
+You should set the output to something unique, if you are using pthreads, then the thread id should be included in the filename, else use a mixture of session/path/process id.
+The profiler does not care if the file it writes to contains a profile, the contents will be truncated on every write. If the output is not set explicitly at some point during execution, the default path of /tmp/profile.callgrind will be written too.
 
 ```
 void profiler_disable();
@@ -69,57 +69,12 @@ By default, the profiler will record the impact a function call has on the amoun
 Callgrind Screenshots
 =====================
 
-profiler is able to output in the defacto callgrind format, which you can inspect using your favourite grinder ...
+profiler output is in the defacto callgrind format, which you can inspect using your favourite grinder ...
 
 ![alt text](https://github.com/krakjoe/profiler/raw/master/screenshots/kcachegrind-memory.png "Memory Profile View")
 ![alt text](https://github.com/krakjoe/profiler/raw/master/screenshots/kcachegrind-cpu.png "CPU Profile View")
 
+Callgrind Notes
+===============
 
-Example Output
-==============
-
-The profile data is also accessible in it's true form, calling profiler_fetch will construct an array so that you can analyze the data without the use of grinders.
-
-```
-[...] => Array
-(
-    [type] => 1
-    [timing] => Array
-        (
-            [entered] => Array
-                (
-                    [tv_sec] => 1356280086
-                    [tv_usec] => 700295
-                )
-
-            [left] => Array
-                (
-                    [tv_sec] => 1356280086
-                    [tv_usec] => 910377
-                )
-
-        )
-
-    [location] => Array
-        (
-            [file] => /usr/src/php-5.4.8/ext/profiler/test.php
-            [line] => 23
-        )
-
-    [call] => Array
-        (
-            [function] => my_test_method
-            [scope] => my_test_class
-            [memory] => 1784
-			[cpu] => 124964
-        )
-
-)
-```
-
-Notes
-=====
-There is negligable overhead not accounted for with each element in the profile data - the overhead of a call is not adjusted to reflect this.
-
-Giving direct access to the information at profile_fetch() time allows you to profile production applications with minimal overhead, during recording the overhead of the profiler should be negligable in most cases.
-
+profiler does not bother to generate a call tree, a decent callgrind viewer will still show detailed information with annotated source code, but the idea is to generate an overhead free summary of resource usage, rather than a full call tree - which I haven't yet found a way to do without incurring allocation and overhead.

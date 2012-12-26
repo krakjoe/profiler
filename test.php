@@ -23,5 +23,5 @@ $test = new my_test_class();
 $test->my_test_method();
 
 
-profiler_callgrind(fopen("profile.callgrind", "w"));
+profiler_output("/tmp/profile.callgrind");
 ?>

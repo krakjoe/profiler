@@ -48,10 +48,9 @@ PHP_MINFO_FUNCTION(profiler);
 #define PROF_G(v) (profiler_globals.v)
 #endif
 
-typedef struct {
-	struct timeval entered;
-	struct timeval left;
-} timing_t;
+#ifndef PROFILER_MAX_FRAMES
+#	define PROFILER_MAX_FRAMES 1000
+#endif
 
 typedef unsigned long long ticks_t;
 typedef struct {
@@ -68,22 +67,23 @@ typedef struct {
 
 typedef struct {
 	uint type;
-	timing_t timing;
 	location_t location;
 	call_t call;
-} *profile_t;
+} profile, *profile_t;
 
 ZEND_BEGIN_MODULE_GLOBALS(profiler)
 	zend_bool	enabled;
 	zend_bool	memory;
-	zend_bool	timing;
-	zend_llist	profile;
+	zend_bool	reset;
+	char		*output;
+	
+	profile		frames[PROFILER_MAX_FRAMES];
+	profile_t	frame;
+	profile_t	limit;
 ZEND_END_MODULE_GLOBALS(profiler)
 
 PHP_FUNCTION(profiler_enable);
-PHP_FUNCTION(profiler_fetch);
-PHP_FUNCTION(profiler_callgrind);
-PHP_FUNCTION(profiler_clear);
+PHP_FUNCTION(profiler_output);
 PHP_FUNCTION(profiler_disable);
 
 #endif

@@ -1,8 +1,14 @@
 // $Id$
 // vim:ft=javascript
 
-ARG_ENABLE("profiler", "enable profiler support", "no");
-
+ARG_ENABLE(
+	"profiler", 
+	"enable profiler support", "no"
+);
+ARG_WITH(
+	"profiler-max-frames", 
+	"adjust profiler maximum frames", "1000"
+);
 if (PHP_PROFILER != "no") {
 	EXTENSION("profiler", "php_profiler.c");
 }
