@@ -52,6 +52,22 @@ PHP_MINFO_FUNCTION(profiler);
 #	define PROFILER_MAX_FRAMES 1000
 #endif
 
+#ifndef PROFILER_NAME
+# define PROFILER_NAME "profiler"
+#endif
+
+#ifndef PROFILER_VERSION
+# define PROFILER_VERSION "0.4"
+#endif
+
+#ifndef PROFILER_AUTHOR
+# define PROFILER_AUTHOR "pthreads"
+#endif
+
+#ifndef PROFILER_URL
+# define PROFILER_URL "http://pthreads.org"
+#endif
+
 typedef unsigned long long ticks_t;
 typedef struct {
 	const char *scope;
@@ -66,7 +82,6 @@ typedef struct {
 } location_t;
 
 typedef struct {
-	uint type;
 	location_t location;
 	call_t call;
 } profile, *profile_t;

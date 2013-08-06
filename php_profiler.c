@@ -26,12 +26,10 @@
 #include "php_ini.h"
 #include "php_streams.h"
 #include "ext/standard/info.h"
+
 #include "php_profiler.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(profiler)
-
-#define PROFILE_NORMAL 	1
-#define PROFILE_INTERN	2
 
 #ifndef _WIN32
 static __inline__ ticks_t ticks(void) {
@@ -46,8 +44,13 @@ static inline ticks_t ticks(void) {
 }
 #endif
 
-static void profiler_execute(zend_op_array *ops TSRMLS_DC);
-static void profiler_execute_internal(zend_execute_data *data, int return_value_used TSRMLS_DC);
+#if PHP_VERSION_ID >= 50500
+void (*zend_execute_old)(zend_execute_data *execute_data TSRMLS_DC);
+void profiler_execute(zend_execute_data *execute_data TSRMLS_DC);
+#else
+void (*zend_execute_old)(zend_op_array *op_array TSRMLS_DC);
+void profiler_execute(zend_op_array *ops TSRMLS_DC);
+#endif
 
 const zend_function_entry profiler_functions[] = {
 	PHP_FE(profiler_enable, NULL)
@@ -60,7 +63,7 @@ zend_module_entry profiler_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
 	STANDARD_MODULE_HEADER,
 #endif
-	"profiler",
+	PROFILER_NAME,
 	profiler_functions,
 	PHP_MINIT(profiler),
 	PHP_MSHUTDOWN(profiler),
@@ -68,7 +71,7 @@ zend_module_entry profiler_module_entry = {
 	PHP_RSHUTDOWN(profiler),
 	PHP_MINFO(profiler),
 #if ZEND_MODULE_API_NO >= 20010901
-	"0.4",
+	PROFILER_VERSION,
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -95,11 +98,13 @@ static inline void profiler_globals_dtor(zend_profiler_globals *pg TSRMLS_DC) {}
 
 PHP_MINIT_FUNCTION(profiler)
 {
-	zend_execute = profiler_execute;
-	zend_execute_internal = profiler_execute_internal;
-	
-	REGISTER_LONG_CONSTANT("PROFILE_NORMAL", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("PROFILE_INTERN", PROFILE_NORMAL, CONST_CS | CONST_PERSISTENT);
+#if PHP_VERSION_ID >= 50500
+    zend_execute_old = zend_execute_ex;
+    zend_execute_ex = profiler_execute;
+#else
+    zend_execute_old = zend_execute;
+    zend_execute = profiler_execute;
+#endif
 	
 	REGISTER_INI_ENTRIES();
 
@@ -212,14 +217,17 @@ PHP_FUNCTION(profiler_disable)
 	} else zend_error(E_WARNING, "the profiler is already disabled");
 }
 
-static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
+#if PHP_VERSION_ID >= 50500
+void profiler_execute(zend_execute_data *input TSRMLS_DC) {
+#else
+void profiler_execute(zend_op_array *input TSRMLS_DC) {
+#endif
 	ulong line = 0L;
+	
 	if (PROF_G(enabled) && 
 		(PROF_G(frame) < PROF_G(limit)) && 
 		(line = zend_get_executed_lineno(TSRMLS_C))) {
-
-		profile_t profile = PROF_G(frame)++;
-		profile->type = type;
+	    profile_t profile = PROF_G(frame)++;
 		profile->location.file = zend_get_executed_filename(TSRMLS_C);
 		profile->location.line = line;
 		profile->call.function = get_active_function_name(TSRMLS_C);
@@ -229,34 +237,13 @@ static inline void _profile(void *_input, uint type, int uret TSRMLS_DC) {
 			profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
 	
 		profile->call.cpu = ticks();
-		switch(type) {
-			case PROFILE_INTERN: {
-				execute_internal((zend_execute_data *) _input, uret TSRMLS_CC);	
-			} break;
-	
-			case PROFILE_NORMAL: {
-				execute((zend_op_array*) _input TSRMLS_CC);
-			} break;
-		}
+		zend_execute_old(
+		    input TSRMLS_CC);
 		profile->call.cpu = ticks() - profile->call.cpu;
 
 		if (PROF_G(memory))
 			profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
-	} else switch(type) {
-		case PROFILE_INTERN: {
-			execute_internal((zend_execute_data *) _input, uret TSRMLS_CC);	
-		} break;
-	
-		case PROFILE_NORMAL: {
-			execute((zend_op_array*) _input TSRMLS_CC);
-		} break;
-	}
+			
+    } else zend_execute_old(input TSRMLS_CC);
 }
 
-static void profiler_execute(zend_op_array *ops TSRMLS_DC) {
-	_profile(ops, PROFILE_NORMAL, 0 TSRMLS_CC);
-}
-
-static void profiler_execute_internal(zend_execute_data *data, int return_value_used TSRMLS_DC) {
-	_profile(data, PROFILE_INTERN, return_value_used TSRMLS_CC);
-}
