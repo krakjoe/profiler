@@ -31,6 +31,8 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(profiler)
 
+static zend_bool profiler_initialized = 0;
+
 #ifndef _WIN32
 static __inline__ ticks_t ticks(void) {
 	unsigned x, y;
@@ -46,10 +48,14 @@ static inline ticks_t ticks(void) {
 
 #if PHP_VERSION_ID >= 50500
 void (*zend_execute_old)(zend_execute_data *execute_data TSRMLS_DC);
+void (*zend_execute_internal_old)(zend_execute_data *execute_data_ptr, zend_fcall_info *fci, int return_value_used TSRMLS_DC);
 void profiler_execute(zend_execute_data *execute_data TSRMLS_DC);
+void profiler_execute_internal(zend_execute_data *execute_data_ptr, zend_fcall_info *fci, int return_value_used TSRMLS_DC);
 #else
 void (*zend_execute_old)(zend_op_array *op_array TSRMLS_DC);
+void (*zend_execute_internal_old)(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
 void profiler_execute(zend_op_array *ops TSRMLS_DC);
+void profiler_execute_internal(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC);
 #endif
 
 const zend_function_entry profiler_functions[] = {
@@ -94,10 +100,14 @@ static inline void profiler_globals_ctor(zend_profiler_globals *pg TSRMLS_DC) {
 	pg->frame = &pg->frames[0];
 	pg->limit = &pg->frames[PROFILER_MAX_FRAMES];
 }
-static inline void profiler_globals_dtor(zend_profiler_globals *pg TSRMLS_DC) {}
 
 PHP_MINIT_FUNCTION(profiler)
 {
+    if (profiler_initialized)
+        return SUCCESS;
+    
+    profiler_initialized = 1;
+    
 #if PHP_VERSION_ID >= 50500
     zend_execute_old = zend_execute_ex;
     zend_execute_ex = profiler_execute;
@@ -105,18 +115,29 @@ PHP_MINIT_FUNCTION(profiler)
     zend_execute_old = zend_execute;
     zend_execute = profiler_execute;
 #endif
+
+    zend_execute_internal_old = zend_execute_internal;
+    zend_execute_internal = profiler_execute_internal;
 	
 	REGISTER_INI_ENTRIES();
 
-	ZEND_INIT_MODULE_GLOBALS(profiler, profiler_globals_ctor, profiler_globals_dtor);
-
+	ZEND_INIT_MODULE_GLOBALS(profiler, profiler_globals_ctor, NULL);
+    
 	return SUCCESS;
 }
 
 PHP_MSHUTDOWN_FUNCTION(profiler)
 {
 	UNREGISTER_INI_ENTRIES();
+	
+#if PHP_VERSION_ID >= 50500
+    zend_execute_ex = zend_execute_old;
+#else
+    zend_execute = zend_execute_old;
+#endif
 
+    zend_execute_internal = zend_execute_internal_old;
+    
 	return SUCCESS;
 }
 
@@ -125,7 +146,7 @@ PHP_RINIT_FUNCTION(profiler)
 	PROF_G(enabled) = INI_BOOL("profiler.enabled");
 	PROF_G(memory) = INI_BOOL("profiler.memory");
 	PROF_G(output) = INI_STR("profiler.output");
-	
+
 	return SUCCESS;
 }
 
@@ -145,27 +166,30 @@ PHP_RSHUTDOWN_FUNCTION(profiler)
 			
 			profile = &PROF_G(frames)[0];		
 			end = PROF_G(frame);			
-			do {
-				if (profile) {
-					fprintf(stream, "fl=%s\n", profile->location.file);
-					if (profile->call.scope && strlen(profile->call.scope)) {
-						fprintf(stream, "fn=%s::%s\n", profile->call.scope, profile->call.function);
-					} else fprintf(stream, "fn=%s\n", profile->call.function);
+			
+			if (profile < end) {
+			    do {
+				    if (profile) {
+					    fprintf(stream, "fl=%s\n", profile->location.file);
+					    if (profile->call.scope && strlen(profile->call.scope)) {
+						    fprintf(stream, "fn=%s::%s\n", profile->call.scope, profile->call.function);
+					    } else fprintf(stream, "fn=%s\n", profile->call.function);
 					
-					if (PROF_G(memory)) {
-						fprintf(
-							stream, 
-							"%d %ld %lld\n", 
-							profile->location.line, (profile->call.memory > 0L) ? profile->call.memory : 0L, profile->call.cpu
-						);
-					} else fprintf(
-						stream, 
-						"%d %lld\n", 
-						profile->location.line, profile->call.cpu
-					);
-					fprintf(stream, "\n");
-				} else break;
-			} while (++profile < end);
+					    if (PROF_G(memory)) {
+						    fprintf(
+							    stream, 
+							    "%d %ld %lld\n", 
+							    profile->location.line, (profile->call.memory > 0L) ? profile->call.memory : 0L, profile->call.cpu
+						    );
+					    } else fprintf(
+						    stream, 
+						    "%d %lld\n", 
+						    profile->location.line, profile->call.cpu
+					    );
+					    fprintf(stream, "\n");
+				    } else break;
+			    } while (++profile < end);
+			}
 			fclose(stream);
 		} else zend_error(E_WARNING, "the profiler has failed to open %s for writing", PROF_G(output));
 		if (PROF_G(reset))
@@ -245,5 +269,48 @@ void profiler_execute(zend_op_array *input TSRMLS_DC) {
 			profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
 			
     } else zend_execute_old(input TSRMLS_CC);
+}
+
+#if PHP_API_VERSION >= 50500
+void profiler_execute_internal(zend_execute_data *execute_data_ptr, zend_fcall_info *fci, int return_value_used TSRMLS_DC) {
+#else
+void profiler_execute_internal(zend_execute_data *execute_data_ptr, int return_value_used TSRMLS_DC) {
+#endif
+    ulong line = 0L;
+	
+	if (PROF_G(enabled) && 
+		(PROF_G(frame) < PROF_G(limit)) && 
+		(line = zend_get_executed_lineno(TSRMLS_C))) {
+	    profile_t profile = PROF_G(frame)++;
+		profile->location.file = zend_get_executed_filename(TSRMLS_C);
+		profile->location.line = line;
+		profile->call.function = get_active_function_name(TSRMLS_C);
+		profile->call.scope = (EG(called_scope)) ? EG(called_scope)->name : "";
+
+		if (PROF_G(memory))
+			profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
+
+		profile->call.cpu = ticks();
+#if PHP_API_VERSION >= 50500
+        execute_internal(
+		    execute_data_ptr, fci, return_value_used TSRMLS_CC);
+#else
+        execute_internal(
+		    execute_data_ptr, return_value_used TSRMLS_CC);
+#endif
+		profile->call.cpu = ticks() - profile->call.cpu;
+
+		if (PROF_G(memory))
+			profile->call.memory = (zend_memory_usage(0 TSRMLS_CC) - profile->call.memory);
+			
+    } else {
+#if PHP_API_VERSION >= 50500
+        execute_internal(
+		    execute_data_ptr, fci, return_value_used TSRMLS_CC);
+#else
+        execute_internal(
+		    execute_data_ptr, return_value_used TSRMLS_CC);
+#endif
+    }
 }
 
