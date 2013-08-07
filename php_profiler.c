@@ -259,7 +259,7 @@ void profiler_execute(zend_op_array *input TSRMLS_DC) {
 
 		if (PROF_G(memory))
 			profile->call.memory = zend_memory_usage(0 TSRMLS_CC);
-	
+
 		profile->call.cpu = ticks();
 		zend_execute_old(
 		    input TSRMLS_CC);
