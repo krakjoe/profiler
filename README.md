@@ -7,7 +7,7 @@ The callgrind it produces can help you to find bottlenecks in your code and iden
 Features
 ========
 
-* Profile all userland function and method calls.
+* Profile all userland and internal function and method calls.
 * Detect memory, and CPU usage for each and every call while the profiler is enabled.
 * Enable/Disable profiler during runtime, allowing you to profile an entire request or just a block of code during a request.
 * Profile production applications with little to no impact on speed and performance.
